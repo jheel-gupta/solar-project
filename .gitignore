@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment variables
+.env
+client/.env
+server/.env
+
+# Build outputs
+dist/
+build/
+client/dist/
+server/dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Vite
+.vite/
+
+# Coverage reports
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Optional: ignore large raster datasets
+# Uncomment if you DON'T want to upload flux.tif
+*.tif
+*.tiff

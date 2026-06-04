@@ -1,0 +1,18 @@
+.sidebar {
+  position: absolute;
+
+  top: 20px;
+  left: 20px;
+
+  width: 350px;
+
+  background: white;
+
+  border-radius: 16px;
+
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+
+  z-index: 100;
+
+  padding: 20px;
+}
