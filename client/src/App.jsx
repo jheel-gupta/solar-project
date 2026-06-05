@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoadScript } from "@react-google-maps/api";
 
 import SearchBox from "./components/SearchBox";
 import SolarInfoCard from "./components/SolarInfoCard";
 import MapView from "./components/MapView";
-import SideBar from './components/SideBar';
+import SideBar from "./components/SideBar";
 import LoadingSpinner from "./components/LoadingSpinner";
 
 import { fetchSolarData } from "./services/solarApi";
@@ -15,8 +15,7 @@ const defaultCenter = {
   lng: 78.9629,
 };
 
-const libraries = ["places"];
-
+const libraries = ["places", "geometry"];
 
 function App() {
   const [map, setMap] = useState(null);
@@ -25,21 +24,28 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [solarData, setSolarData] = useState(null);
-  const [solarPanels, setSolarPanels] = useState([]);
   const [showPanels, setShowPanels] = useState(false);
   const [roofPolygon, setRoofPolygon] = useState([]);
   const [layersData, setLayersData] = useState(null);
+  const [selectedConfigIndex, setSelectedConfigIndex] = useState(0);
 
-  console.log(showPanels);
+  useEffect(() => {
+    const configs = solarData?.solarPotential?.solarPanelConfigs || [];
+    if (configs.length > 0) {
+      setSelectedConfigIndex(configs.length - 1);
+    } else {
+      setSelectedConfigIndex(0);
+    }
+  }, [solarData]);
 
   const onPlaceChanged = async () => {
     if (!autocomplete || !map) return;
 
     const place = autocomplete.getPlace();
+    if (!place?.geometry?.location) return;
 
     const lat = place.geometry.location.lat();
     const lng = place.geometry.location.lng();
-
     const newLocation = { lat, lng };
 
     setSelectedLocation(newLocation);
@@ -48,34 +54,21 @@ function App() {
       setLoading(true);
       setError("");
 
-      const data = await fetchSolarData(lat, lng);
-      const layers = await fetchLayers(lat,lng);
-      console.log("LAYERS OBJECT: ");
-      console.log(layers);
+      const [data, layers] = await Promise.all([
+        fetchSolarData(lat, lng),
+        fetchLayers(lat, lng),
+      ]);
 
-      console.log(JSON.stringify(layers,null,2));
+      setSolarData(data);
+      setLayersData(layers);
 
       console.log("Solar Data:", data);
-
-      setLayersData(layers);
-      
-      console.log(data.solarPotential);
-      console.log(data.solarPotential.solarPanels);
-      console.log(data.solarPotential.solarPanels[0]);
-      console.log(
-        "Panel Count:",
-        data.solarPotential.solarPanels.length
-      );
-
-      setLoading(false);
-      setSolarData(data);
-
-      setSolarPanels(
-        data.solarPotential.solarPanels
-      );
-    } catch (error) {
-      console.log(error);
+      console.log("Layers Data:", layers);
+    } catch (err) {
+      console.error(err);
       setError("Failed to load solar data");
+    } finally {
+      setLoading(false);
     }
 
     map.panTo(newLocation);
@@ -86,75 +79,75 @@ function App() {
     const lat = event.latLng.lat();
     const lng = event.latLng.lng();
 
-    console.log(event)
-    console.log("Dragged:", lat, lng);
-
-    const newLocation = {lat , lng};
+    const newLocation = { lat, lng };
     setSelectedLocation(newLocation);
 
-    if(map) map.panTo(newLocation)
+    if (map) {
+      map.panTo(newLocation);
+    }
 
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetchSolarData(lat,lng);
-      setSolarData(response);
+      const [data, layers] = await Promise.all([
+        fetchSolarData(lat, lng),
+        fetchLayers(lat, lng),
+      ]);
 
-      setSolarPanels(response.solarPotential.solarPanels);
+      setSolarData(data);
+      setLayersData(layers);
 
-      setLoading(false);
-    } catch (error) {
-      console.log(error);
+      console.log("Dragged Solar Data:", data);
+      console.log("Dragged Layers Data:", layers);
+    } catch (err) {
+      console.error(err);
       setError("Failed to load solar data");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <LoadScript
-      googleMapsApiKey={
-        import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      }
+      googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
       libraries={libraries}
     >
-    <SideBar>
-      <SearchBox
-        onLoadAutocomplete={setAutocomplete}
-        onPlaceChanged={onPlaceChanged}
-      />
+      <SideBar>
+        <SearchBox
+          onLoadAutocomplete={setAutocomplete}
+          onPlaceChanged={onPlaceChanged}
+        />
 
-      <div style={{ marginTop: "20px"}}>
-        <label>
-          <input 
-            type="checkbox"
-            checked={showPanels}
-            onChange={() => 
-              setShowPanels(prev => !prev)
-            }
-            />
-            
+        <div style={{ marginTop: "20px" }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={showPanels}
+              onChange={() => setShowPanels((prev) => !prev)}
+            />{" "}
             Show Panels
-        </label>
-      </div>
+          </label>
+        </div>
 
-      {loading && (
-        <LoadingSpinner />
-      )}
-    {error && (
-      <p>{error}</p>
-    )}
+        {loading && <LoadingSpinner />}
+        {error && <p>{error}</p>}
 
-      <SolarInfoCard solarData={solarData} />
-
-    </SideBar>
+        <SolarInfoCard
+          solarData={solarData}
+          selectedConfigIndex={selectedConfigIndex}
+          setSelectedConfigIndex={setSelectedConfigIndex}
+        />
+      </SideBar>
 
       <MapView
         selectedLocation={selectedLocation}
         onLoadMap={setMap}
-        onMarkerDragEnd = {handleMarkerDrag}
+        onMarkerDragEnd={handleMarkerDrag}
         roofPolygon={roofPolygon}
         solarData={solarData}
         showPanels={showPanels}
+        selectedConfigIndex={selectedConfigIndex}
       />
     </LoadScript>
   );
