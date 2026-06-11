@@ -10,8 +10,8 @@ export const fetchFluxMaskPoint = async (lat, lng) => {
   return response.data;
 };
 
-export const fetchMonthlyFluxOverlay = async (lat, lng, month) => {
-  const response = await axios.get(`${BASE_URL}/monthly-flux-overlay`, {
+export const fetchMonthlyFlux = async (lat, lng, month) => {
+  const response = await axios.get(`${BASE_URL}/monthly-flux`, {
     params: { lat, lng, month },
   });
   return response.data;
