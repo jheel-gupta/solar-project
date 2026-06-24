@@ -1,22 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { LoadScript } from "@react-google-maps/api";
 
 import SearchBox from "./components/SearchBox";
 import SolarInfoCard from "./components/SolarInfoCard";
 import MapView from "./components/MapView";
-import SideBar from "./components/SideBar";
 import LoadingSpinner from "./components/LoadingSpinner";
 import TimeControls from "./components/TimeControls";
 
-import { fetchSolarData } from "./services/solarApi";
-import { fetchLayers } from "./services/layersAPI";
-
-import {
-  fetchFluxMaskPoint,
-  fetchShadePoint,
-  fetchSuitabilityPoint,
-} from "./services/rasterApi";
-
+import { AppProviders } from "./context/AppProviders";
+import { useLocation } from "./context/LocationContext";
+import { useSolarData } from "./context/SolarDataContext";
 
 const defaultCenter = {
   lat: 20.5937,
@@ -25,69 +18,23 @@ const defaultCenter = {
 
 const libraries = ["places", "geometry"];
 
-function App() {
-  const [map, setMap] = useState(null);
-  const [autocomplete, setAutocomplete] = useState(null);
-  const [selectedLocation, setSelectedLocation] = useState(defaultCenter);
-  const [loading, setLoading] = useState(false);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [solarData, setSolarData] = useState(null);
-  const [showPanels, setShowPanels] = useState(false);
-  const [roofPolygon, setRoofPolygon] = useState([]);
-  const [layersData, setLayersData] = useState(null);
-  const [selectedConfigIndex, setSelectedConfigIndex] = useState(0);
+// AppContent exists separately from App() because hooks like useLocation()
+// and useSolarData() can only be called BELOW <AppProviders>, not inside
+// the same component that renders the providers.
+function AppContent() {
   const [activePanel, setActivePanel] = useState("insights");
 
-  const [timeState, setTimeState] = useState({
-    month: 6,
-    day: 15,
-    hour: 12,
-  });
+  const {
+    map,
+    setMap,
+    autocomplete,
+    setAutocomplete,
+    selectedLocation,
+    setSelectedLocation,
+  } = useLocation();
 
-  const [draftTime, setDraftTime] = useState({
-    month: 6,
-    day: 15,
-    hour: 12,
-  });
-
-  const [analysisData, setAnalysisData] = useState({
-    fluxMask: null,
-    shade: null,
-    suitability: null,
-  });
-
-  useEffect(() => {
-    const configs = solarData?.solarPotential?.solarPanelConfigs || [];
-    if (configs.length > 0) {
-      setSelectedConfigIndex(configs.length - 1);
-    } else {
-      setSelectedConfigIndex(0);
-    }
-  }, [solarData]);
-
-    const loadBuildingData = async (lat, lng) => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const [data, layers] = await Promise.all([
-        fetchSolarData(lat, lng),
-        fetchLayers(lat, lng),
-      ]);
-
-      setSolarData(data);
-      setLayersData(layers);
-
-      console.log("Solar Data:", data);
-      console.log("Layers Data:", layers);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load solar data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { loading, error, showPanels, setShowPanels, loadBuildingData } =
+    useSolarData();
 
   const onPlaceChanged = async () => {
     if (!autocomplete || !map) return;
@@ -121,50 +68,7 @@ function App() {
     await loadBuildingData(lat, lng);
   };
 
-  const handleApplyTime = () => {
-    setTimeState(draftTime);
-  };
-
-  useEffect(() => {
-    const runAnalysis = async () => {
-      const { lat, lng } = selectedLocation || {};
-      if (!lat || !lng) return;
-
-      try {
-        setAnalysisLoading(true);
-
-        const [fluxMask, shade, suitability] = await Promise.all([
-          fetchFluxMaskPoint(lat, lng),
-          fetchShadePoint(
-            lat,
-            lng,
-            timeState.month,
-            timeState.day,
-            timeState.hour
-          ),
-          fetchSuitabilityPoint(lat, lng, timeState.month, timeState.day),
-        ]);
-
-        setAnalysisData({ fluxMask, shade, suitability });
-
-        console.log("Flux/Mask:", fluxMask);
-        console.log("Shade:", shade);
-        console.log("Suitability:", suitability);
-      } catch (err) {
-        console.error("Analysis error:", err);
-      } finally {
-        setAnalysisLoading(false);
-      }
-    };
-
-    runAnalysis();
-  }, [selectedLocation, timeState]);
-
   return (
-  <LoadScript
-    googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-    libraries={libraries}
-  >
     <div
       style={{
         display: "flex",
@@ -228,20 +132,9 @@ function App() {
         {error && <p>{error}</p>}
 
         {activePanel === "insights" ? (
-          <SolarInfoCard
-            solarData={solarData}
-            selectedConfigIndex={selectedConfigIndex}
-            setSelectedConfigIndex={setSelectedConfigIndex}
-            onOpenTimeControls={() => setActivePanel("time")}
-          />
+          <SolarInfoCard onOpenTimeControls={() => setActivePanel("time")} />
         ) : (
-          <TimeControls
-            draftTime={draftTime}
-            setDraftTime={setDraftTime}
-            onApply={handleApplyTime}
-            loading={analysisLoading}
-            onBack={() => setActivePanel("insights")}
-          />
+          <TimeControls onBack={() => setActivePanel("insights")} />
         )}
       </div>
 
@@ -250,15 +143,23 @@ function App() {
           selectedLocation={selectedLocation}
           onLoadMap={setMap}
           onMarkerDragEnd={handleMarkerDrag}
-          roofPolygon={roofPolygon}
-          solarData={solarData}
-          showPanels={showPanels}
-          selectedConfigIndex={selectedConfigIndex}
         />
       </div>
     </div>
-  </LoadScript>
-);
+  );
+}
+
+function App() {
+  return (
+    <LoadScript
+      googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+      libraries={libraries}
+    >
+      <AppProviders>
+        <AppContent />
+      </AppProviders>
+    </LoadScript>
+  );
 }
 
 export default App;

@@ -1,3 +1,6 @@
+import { useTime } from "../context/TimeContext";
+import { useFluxOverlay } from "../context/FluxOverlayContext";
+
 const months = [
   { label: "January", value: 1 },
   { label: "February", value: 2 },
@@ -15,30 +18,26 @@ const months = [
 
 const getDaysInMonth = (month) => {
   const daysMap = {
-    1: 31,
-    2: 28,
-    3: 31,
-    4: 30,
-    5: 31,
-    6: 30,
-    7: 31,
-    8: 31,
-    9: 30,
-    10: 31,
-    11: 30,
-    12: 31,
+    1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30,
+    7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31,
   };
-
   return daysMap[month] || 30;
 };
 
-export default function TimeControls({
-  draftTime,
-  setDraftTime,
-  onApply,
-  loading,
-  onBack,
-}) {
+// onBack stays a prop — it's navigation state owned by App.jsx's
+// activePanel, not shared app data, so it doesn't belong in context.
+export default function TimeControls({ onBack }) {
+  const { draftTime, setDraftTime, handleApplyTime, analysisLoading } =
+    useTime();
+
+  const {
+    showFluxOverlay,
+    setShowFluxOverlay,
+    monthlyFluxOverlay,
+    maskRooftop,
+    setMaskRooftop,
+  } = useFluxOverlay();
+
   const handleMonthChange = (e) => {
     const month = Number(e.target.value);
 
@@ -82,18 +81,87 @@ export default function TimeControls({
       </div>
 
       <div style={styles.controlGroup}>
-        <label style={styles.label}>Month</label>
-        <select
+        <label style={styles.label}>
+          Month: <strong>{months.find((m) => m.value === draftTime.month)?.label}</strong>
+        </label>
+        <input
+          type="range"
+          min="1"
+          max="12"
+          step="1"
           value={draftTime.month}
           onChange={handleMonthChange}
-          style={styles.select}
-        >
+          style={styles.slider}
+        />
+        <div style={styles.monthTicks}>
           {months.map((month) => (
-            <option key={month.value} value={month.value}>
-              {month.label}
-            </option>
+            <span
+              key={month.value}
+              style={{
+                fontSize: "10px",
+                color: month.value === draftTime.month ? "#111827" : "#6b7280",
+                fontWeight: month.value === draftTime.month ? 700 : 500,
+                textAlign: "center",
+              }}
+            >
+              {month.label.slice(0, 3)}
+            </span>
           ))}
-        </select>
+        </div>
+      </div>
+
+      <div style={styles.controlGroup}>
+        <button
+          type="button"
+          onClick={() => setShowFluxOverlay((prev) => !prev)}
+          style={{
+            ...styles.button,
+            background: showFluxOverlay ? "#ca8a04" : "#1f2937",
+          }}
+        >
+          {showFluxOverlay ? "Hide Monthly Solar Flux" : "Show Monthly Solar Flux"}
+        </button>
+
+        {showFluxOverlay && (
+          <button
+            type="button"
+            onClick={() => setMaskRooftop((prev) => !prev)}
+            style={{
+              ...styles.button,
+              marginTop: "8px",
+              background: maskRooftop ? "#059669" : "#6b7280",
+            }}
+          >
+            {maskRooftop ? "Showing Rooftops Only" : "Mask Rooftop Only"}
+          </button>
+        )}
+
+        {showFluxOverlay && monthlyFluxOverlay && (
+          <div
+            style={{
+              marginTop: "8px",
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              fontSize: "12px",
+              color: "#374151",
+            }}
+          >
+            <div>
+              Month flux range: <strong>{monthlyFluxOverlay.minFlux?.toFixed?.(2)}</strong> to{" "}
+              <strong>{monthlyFluxOverlay.maxFlux?.toFixed?.(2)}</strong>
+            </div>
+            {maskRooftop && (
+              <div style={{ marginTop: "4px", color: "#059669", fontWeight: 600 }}>
+                Showing roof pixels only — streets and trees hidden
+              </div>
+            )}
+            <div style={{ marginTop: "6px" }}>
+              The overlay gets deeper in months with stronger flux and lighter in lower-flux months.
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={styles.controlGroup}>
@@ -126,8 +194,8 @@ export default function TimeControls({
         />
       </div>
 
-      <button onClick={onApply} disabled={loading} style={styles.button}>
-        {loading ? "Analyzing..." : "Apply Time"}
+      <button onClick={handleApplyTime} disabled={analysisLoading} style={styles.button}>
+        {analysisLoading ? "Analyzing..." : "Apply Time"}
       </button>
     </div>
   );
@@ -177,12 +245,10 @@ const styles = {
     cursor: "pointer",
     fontSize: "13px",
   },
-
   headerRow: {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
   },
   iconButton: {
     width: "32px",
@@ -197,5 +263,11 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+  },
+  monthTicks: {
+    display: "grid",
+    gridTemplateColumns: "repeat(12, 1fr)",
+    gap: "2px",
+    marginTop: "4px",
   },
 };

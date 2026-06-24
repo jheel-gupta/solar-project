@@ -11,6 +11,7 @@ const rasterRoutes = require("./routes/rasterRoutes");
 const app = express();
 
 app.use(cors());
+app.use(express.json());
 
 app.use("/solar", solarRoutes);
 app.use("/layers",layersRoute);
